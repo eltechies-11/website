@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #020817;
+  --navy-soft: #07111f;
+  --navy-elevated: #0b1628;
+  --cyan: #00d1ff;
+  --cyan-soft: #67e8f9;
+  --blue: #1e40af;
+  --ink: #021018;
+  --background: var(--navy);
+  --foreground: #f8fafc;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-elevated: var(--navy-elevated);
+  --color-cyan: var(--cyan);
+  --color-cyan-soft: var(--cyan-soft);
+  --color-blue: var(--blue);
+  --color-ink: var(--ink);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Prevent Samsung/Android system dark mode from greying out CTA buttons */
+  .btn-primary,
+  .btn-secondary {
+    color-scheme: only light;
+    forced-color-adjust: none;
+    -webkit-tap-highlight-color: transparent;
+    opacity: 1;
+  }
+
+  .btn-primary {
+    background-color: #00d1ff !important;
+    color: #021018 !important;
+    -webkit-text-fill-color: #021018;
+  }
+
+  .btn-primary:hover {
+    background-color: #5be7ff !important;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.55;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--cyan) 35%, transparent);
+    color: white;
+  }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fade-up 0.8s ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up {
+      animation: none;
+    }
+
+    .reveal-item {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+
+  /* If JS never runs, keep reveal content visible */
+  @media (scripting: none) {
+    .reveal-item {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+
+    .animate-fade-up {
+      animation: none;
+    }
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
