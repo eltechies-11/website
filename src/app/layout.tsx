@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { siteConfig } from "@/content/site";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { themeInitScript } from "@/lib/theme-script";
 import "./globals.css";
 
 const sans = Plus_Jakarta_Sans({
@@ -69,17 +71,27 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020817",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#020817" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f6fb" },
+  ],
+  colorScheme: "dark light",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} h-full scroll-smooth`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} dark h-full scroll-smooth`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full bg-navy font-sans text-foreground antialiased">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

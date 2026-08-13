@@ -1,17 +1,26 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { siteConfig } from "@/content/site";
+import { BrandLogo } from "@/components/BrandLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
 
+function sectionFromHashHref(href: string) {
+  if (!href.includes("#")) return "";
+  return `#${href.split("#")[1] ?? ""}`;
+}
+
 export function Header() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState("#home");
+  const [activeSection, setActiveSection] = useState("#home");
+  const onCareers = pathname === "/careers";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -21,7 +30,18 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    const sectionIds = ["home", "services", "about", "approach", "process", "careers", "contact"];
+    if (onCareers) return;
+
+    const sectionIds = [
+      "home",
+      "services",
+      "work",
+      "testimonials",
+      "about",
+      "approach",
+      "process",
+      "contact",
+    ];
     const elements = sectionIds
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => Boolean(el));
@@ -33,10 +53,12 @@ export function Header() {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible?.target.id) {
           const href = `#${visible.target.id}`;
-          if (["#home", "#services", "#about", "#careers", "#contact"].includes(href)) {
-            setActive(href);
+          if (["#home", "#services", "#work", "#about", "#contact"].includes(href)) {
+            setActiveSection(href);
+          } else if (href === "#testimonials") {
+            setActiveSection("#work");
           } else if (href === "#approach" || href === "#process") {
-            setActive("#about");
+            setActiveSection("#about");
           }
         }
       },
@@ -45,7 +67,7 @@ export function Header() {
 
     elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [onCareers]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -56,31 +78,30 @@ export function Header() {
 
   const closeMenu = () => setOpen(false);
 
+  const isActive = (href: string) => {
+    if (href === "/careers") return onCareers;
+    if (onCareers) return false;
+    return sectionFromHashHref(href) === activeSection;
+  };
+
   return (
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-300",
         scrolled || open
-          ? "border-b border-white/8 bg-navy/90 backdrop-blur-md"
+          ? "border-b border-fg/8 bg-navy/85 shadow-[0_10px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl"
           : "bg-transparent",
       )}
     >
       <Container className="flex h-16 items-center justify-between sm:h-[4.25rem]">
         <a
-          href="#home"
+          href="/#home"
           className="group relative flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-navy"
           onClick={closeMenu}
         >
-          <Image
-            src={siteConfig.assets.logo}
-            alt={`${siteConfig.name} logo`}
-            width={44}
-            height={44}
-            className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10 transition group-hover:ring-cyan/40 sm:h-11 sm:w-11"
-            priority
-          />
-          <span className="ml-3 text-[1.05rem] font-semibold tracking-tight text-white">
-            <span className="text-white">EL</span>
+          <BrandLogo priority className="transition duration-300 group-hover:scale-[1.03]" />
+          <span className="ml-3 text-xl font-semibold leading-none tracking-tight text-fg sm:text-2xl">
+            <span className="text-fg">EL</span>
             <span className="bg-gradient-to-r from-cyan to-blue bg-clip-text text-transparent">
               techies
             </span>
@@ -94,35 +115,37 @@ export function Header() {
               href={item.href}
               className={cn(
                 "rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-navy lg:px-3",
-                active === item.href
-                  ? "text-cyan"
-                  : "text-white/70 hover:text-white",
+                isActive(item.href) ? "text-cyan" : "text-fg/70 hover:text-fg",
               )}
             >
               {item.label}
             </a>
           ))}
-          <Button href="#contact" size="md" className="ml-2 lg:ml-3">
+          <ThemeToggle className="ml-1 lg:ml-2" />
+          <Button href="/#contact" size="md" className="ml-1 lg:ml-2">
             Let&apos;s Talk
           </Button>
         </nav>
 
-        <button
-          type="button"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 text-white transition hover:border-cyan/40 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan md:hidden"
-          aria-expanded={open}
-          aria-controls="mobile-nav"
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-fg/10 text-fg transition hover:border-cyan/40 hover:bg-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "Close menu" : "Open menu"}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </Container>
 
       <div
         id="mobile-nav"
         className={cn(
-          "md:hidden overflow-hidden border-t border-white/8 bg-navy/95 backdrop-blur-md transition-[max-height,opacity] duration-300 ease-out",
+          "md:hidden overflow-hidden border-t border-fg/8 bg-navy/95 backdrop-blur-md transition-[max-height,opacity] duration-300 ease-out",
           open ? "max-h-[32rem] opacity-100" : "pointer-events-none max-h-0 opacity-0",
         )}
         aria-hidden={!open}
@@ -136,16 +159,16 @@ export function Header() {
               tabIndex={open ? 0 : -1}
               className={cn(
                 "rounded-lg px-3 py-3 text-base font-medium transition-colors",
-                active === item.href
-                  ? "bg-white/5 text-cyan"
-                  : "text-white/80 hover:bg-white/5 hover:text-white",
+                isActive(item.href)
+                  ? "bg-fg/5 text-cyan"
+                  : "text-fg/80 hover:bg-fg/5 hover:text-fg",
               )}
             >
               {item.label}
             </a>
           ))}
           <Button
-            href="#contact"
+            href="/#contact"
             size="lg"
             className="mt-2 w-full"
             onClick={closeMenu}

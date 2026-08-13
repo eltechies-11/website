@@ -65,11 +65,12 @@ Forms post to `/api/contact` with type `sales` or `career`.
 ```env
 SALES_EMAIL=sales@eltechies.com
 CAREER_EMAIL=career@eltechies.com
+NEXT_PUBLIC_SITE_URL=https://eltechies.com
 ```
 
 Email subjects are prefixed with `[Sales]` or `[Career]`.
 
-**One-time activation:** the first submission to each inbox sends a FormSubmit confirmation email. Open it and click **Confirm**.
+**One-time activation:** the first submission from a new domain (e.g. `eltechies.com`) sends a FormSubmit confirmation email. Open it and click **Activate Form**. Localhost and production are activated separately.
 
 ### Edit content
 
@@ -94,7 +95,7 @@ Best approach: **host the app on Vercel (free) + keep your domain on GoDaddy**.
 
    - `SALES_EMAIL` = `sales@eltechies.com`
    - `CAREER_EMAIL` = `career@eltechies.com`
-   - (optional) `NEXT_PUBLIC_SITE_URL` = `https://yourdomain.com`
+   - `NEXT_PUBLIC_SITE_URL` = `https://eltechies.com`
 
 6. Click **Deploy**.
 7. You’ll get a temporary URL like `https://eltechies.vercel.app` — confirm the site works.

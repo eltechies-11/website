@@ -8,26 +8,26 @@ export function CTA() {
   const { cta } = siteConfig;
 
   return (
-    <section className="relative bg-navy py-20 sm:py-24" aria-label="Call to action">
+    <section className="relative py-10 sm:py-12" aria-label="Call to action">
       <Container>
         <Reveal>
-          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(0,209,255,0.12),rgba(30,64,175,0.18)_45%,rgba(2,8,23,0.9))] px-6 py-12 text-center sm:px-10 sm:py-14">
+          <div className="cta-panel relative overflow-hidden rounded-3xl border border-fg/10 px-6 py-10 text-center sm:px-10 sm:py-12">
             <div
-              className="pointer-events-none absolute inset-0 opacity-40"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 20% 20%, rgba(0,209,255,0.2), transparent 35%), radial-gradient(circle at 80% 80%, rgba(30,64,175,0.25), transparent 40%)",
-              }}
+              className="animate-pulse-glow pointer-events-none absolute -left-10 top-0 h-40 w-40 rounded-full bg-cyan/15 blur-3xl"
+              aria-hidden="true"
+            />
+            <div
+              className="animate-float pointer-events-none absolute -right-8 bottom-0 h-44 w-44 rounded-full bg-blue/20 blur-3xl"
               aria-hidden="true"
             />
             <div className="relative mx-auto max-w-2xl">
-              <h2 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h2 className="text-balance text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
                 {cta.title}
               </h2>
-              <p className="mt-4 text-pretty text-base text-white/65 sm:text-lg">
+              <p className="mt-3 text-pretty text-base text-fg/65 sm:text-lg">
                 {cta.description}
               </p>
-              <div className="mt-8 flex justify-center">
+              <div className="mt-7 flex justify-center">
                 <Button href={cta.button.href} size="lg">
                   {cta.button.label}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />

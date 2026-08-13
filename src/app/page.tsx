@@ -1,13 +1,15 @@
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Services } from "@/components/Services";
+import { Portfolio } from "@/components/Portfolio";
+import { Testimonials } from "@/components/Testimonials";
 import { About } from "@/components/About";
 import { Approach } from "@/components/Approach";
 import { Process } from "@/components/Process";
 import { CTA } from "@/components/CTA";
-import { Careers } from "@/components/Careers";
-import { Contact } from "@/components/Contact";
+import { Connect } from "@/components/Connect";
 import { Footer } from "@/components/Footer";
+import { SiteAtmosphere } from "@/components/SiteAtmosphere";
 
 export default function Home() {
   return (
@@ -18,16 +20,18 @@ export default function Home() {
       >
         Skip to content
       </a>
+      <SiteAtmosphere />
       <Header />
-      <main id="main">
+      <main id="main" className="relative">
         <Hero />
         <Services />
+        <Portfolio />
+        <Testimonials />
         <About />
         <Approach />
         <Process />
         <CTA />
-        <Careers />
-        <Contact />
+        <Connect />
       </main>
       <Footer />
     </>
