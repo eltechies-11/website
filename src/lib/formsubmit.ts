@@ -19,60 +19,25 @@ export type SubmitInquiryResult = {
 function isActivationMessage(message: unknown) {
   if (typeof message !== "string") return false;
   const lower = message.toLowerCase();
-  return lower.includes("activation") || lower.includes("activate form");
+  return lower.includes("needs activation") || lower.includes("activate form");
 }
 
 function isSuccessFlag(success: unknown) {
   return success === true || success === "true";
 }
 
-async function postToFormSubmit(toEmail: string, formData: FormData) {
-  const response = await fetch(
-    `https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`,
-    {
-      method: "POST",
-      headers: { Accept: "application/json" },
-      body: formData,
-    },
-  );
-
-  const rawText = await response.text();
-  let data: { success?: string | boolean; message?: string } | null = null;
-  try {
-    data = JSON.parse(rawText) as { success?: string | boolean; message?: string };
-  } catch {
-    data = null;
-  }
-
-  return {
-    response,
-    rawText,
-    data,
-    providerMessage: data?.message?.trim() || "",
-    ok: response.ok && isSuccessFlag(data?.success),
-  };
-}
-
 /**
  * Browser-side FormSubmit submit.
  * Vercel server IPs are often blocked by FormSubmit/Cloudflare, so the
  * form posts directly from the visitor's browser instead of /api/contact.
- *
- * Career applications use the already-activated sales@ FormSubmit endpoint
- * (with career@ on CC) because FormSubmit activates per recipient email, and
- * career@ still returns "needs Activation" on the live domain.
  */
 export async function submitInquiry(
   input: SubmitInquiryInput,
 ): Promise<SubmitInquiryResult> {
+  const toEmail =
+    input.type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
   const label = input.type === "career" ? "Career" : "Sales";
   const subjectPrefix = input.type === "career" ? "[Career]" : "[Sales]";
-  const notifyEmail =
-    input.type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
-
-  // Sales endpoint is activated on eltechies.com. Career uses it as transport
-  // so applicants aren't blocked by a second FormSubmit activation.
-  const formSubmitEmail = siteConfig.emails.sales;
 
   const subject =
     input.type === "career"
@@ -93,29 +58,47 @@ export async function submitInquiry(
     formData.set("company", input.company?.trim() || "Not provided");
   } else {
     formData.set("role_interest", input.role?.trim() || "Not provided");
-    formData.set("Notify_Team", siteConfig.emails.career);
-    formData.set("_cc", siteConfig.emails.career);
     if (input.resume) {
       formData.set("attachment", input.resume, input.resume.name);
     }
   }
 
-  const primary = await postToFormSubmit(formSubmitEmail, formData);
+  const response = await fetch(
+    `https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`,
+    {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: formData,
+    },
+  );
 
-  if (isActivationMessage(primary.providerMessage) || isActivationMessage(primary.rawText)) {
+  const rawText = await response.text();
+  let data: { success?: string | boolean; message?: string } | null = null;
+  try {
+    data = JSON.parse(rawText) as { success?: string | boolean; message?: string };
+  } catch {
+    data = null;
+  }
+
+  const providerMessage = data?.message?.trim() || "";
+  const ok = response.ok && isSuccessFlag(data?.success);
+
+  // Only treat explicit FormSubmit activation responses as activation.
+  // Do not show a fake success — activation means the email was not delivered.
+  if (!ok && isActivationMessage(providerMessage)) {
     return {
       ok: false,
       activationRequired: true,
-      message: `FormSubmit still needs a one-time Activate Form click for ${formSubmitEmail}. Check that inbox (and spam), activate, then try again. Or email ${notifyEmail} directly.`,
+      message: `FormSubmit needs a one-time Activate Form click for ${toEmail} on this live site. Check that inbox (and spam) for the newest activation email, click Activate Form, then submit again.`,
     };
   }
 
-  if (!primary.ok) {
+  if (!ok) {
     return {
       ok: false,
       message:
-        primary.providerMessage ||
-        `Unable to send your message right now. Please email ${notifyEmail}.`,
+        providerMessage ||
+        `Unable to send your message right now. Please email ${toEmail}.`,
     };
   }
 
