@@ -60,17 +60,26 @@ npm run start
 
 ### Contact / Careers forms
 
-Forms post to `/api/contact` with type `sales` or `career`.
+- **Sales** → FormSubmit from the browser to `sales@eltechies.com`
+- **Careers** → Resend via `/api/contact` to `career@eltechies.com`  
+  (FormSubmit activation emails often never reach custom-domain inboxes like `career@`)
 
 ```env
 SALES_EMAIL=sales@eltechies.com
 CAREER_EMAIL=career@eltechies.com
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM_EMAIL="ELtechies Careers <noreply@eltechies.com>"
 NEXT_PUBLIC_SITE_URL=https://eltechies.com
 ```
 
-Email subjects are prefixed with `[Sales]` or `[Career]`.
+**Resend setup (careers):**
+1. Create an account at [resend.com](https://resend.com)
+2. Add and verify domain `eltechies.com` (DNS records Resend shows)
+3. Create an API key
+4. Add `RESEND_API_KEY` + `RESEND_FROM_EMAIL` in Vercel → Project → Settings → Environment Variables
+5. Redeploy
 
-**One-time activation:** the first submission from a new domain (e.g. `eltechies.com`) sends a FormSubmit confirmation email. Open it and click **Activate Form**. Localhost and production are activated separately.
+Email subjects are prefixed with `[Sales]` or `[Career]`.
 
 ### Edit content
 
@@ -95,6 +104,8 @@ Best approach: **host the app on Vercel (free) + keep your domain on GoDaddy**.
 
    - `SALES_EMAIL` = `sales@eltechies.com`
    - `CAREER_EMAIL` = `career@eltechies.com`
+   - `RESEND_API_KEY` = your Resend API key
+   - `RESEND_FROM_EMAIL` = `ELtechies Careers <noreply@eltechies.com>` (domain must be verified in Resend)
    - `NEXT_PUBLIC_SITE_URL` = `https://eltechies.com`
 
 6. Click **Deploy**.
