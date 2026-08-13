@@ -164,22 +164,35 @@ export async function POST(request: Request) {
         Accept: "application/json",
         Origin: origin,
         Referer: referer,
+        "User-Agent":
+          "Mozilla/5.0 (compatible; ELtechiesContact/1.0; +https://eltechies.com)",
       },
       body: outbound,
       signal: AbortSignal.timeout(20000),
     });
 
     const rawText = await response.text();
-    let data: { success?: string | boolean; message?: string } | null = null;
+    let data: {
+      success?: string | boolean;
+      message?: string;
+      detail?: string;
+      title?: string;
+    } | null = null;
     try {
-      data = JSON.parse(rawText) as { success?: string | boolean; message?: string };
+      data = JSON.parse(rawText) as {
+        success?: string | boolean;
+        message?: string;
+        detail?: string;
+        title?: string;
+      };
     } catch {
       data = null;
     }
 
     const successFlag = data?.success;
     const isSuccess = successFlag === true || successFlag === "true";
-    const providerMessage = data?.message?.trim() || "";
+    const providerMessage =
+      data?.message?.trim() || data?.detail?.trim() || data?.title?.trim() || "";
 
     if (isActivationMessage(providerMessage) || isActivationMessage(rawText)) {
       return NextResponse.json({
@@ -196,6 +209,7 @@ export async function POST(request: Request) {
           error:
             providerMessage ||
             `Unable to send your message right now. Please email ${toEmail}.`,
+          providerStatus: response.status,
         },
         { status: 502 },
       );
