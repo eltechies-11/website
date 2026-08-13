@@ -1,4 +1,3 @@
-import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { siteConfig, type InquiryType } from "@/content/site";
 import { validateResumeFile } from "@/lib/resume";
@@ -38,6 +37,12 @@ function resolveType(value: unknown): InquiryType {
   return value === "career" ? "career" : "sales";
 }
 
+function isActivationMessage(message: unknown) {
+  if (typeof message !== "string") return false;
+  const lower = message.toLowerCase();
+  return lower.includes("activation") || lower.includes("activate form");
+}
+
 async function parseRequest(request: Request): Promise<{
   type: InquiryType;
   name: string;
@@ -75,92 +80,10 @@ async function parseRequest(request: Request): Promise<{
   };
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-async function sendWithResend(options: {
-  toEmail: string;
-  subject: string;
-  name: string;
-  email: string;
-  message: string;
-  company?: string;
-  role?: string;
-  resume: File | null;
-}) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
-    return {
-      ok: false as const,
-      error:
-        "Career email is not configured yet (missing RESEND_API_KEY). Please email career@eltechies.com directly for now.",
-    };
-  }
-
-  const from =
-    process.env.RESEND_FROM_EMAIL?.trim() ||
-    `${siteConfig.name} Careers <onboarding@resend.dev>`;
-
-  const rows = [
-    ["Inquiry type", "Career"],
-    ["Name", options.name],
-    ["Email", options.email],
-    ["Role", options.role || "Not provided"],
-    ["Message", options.message],
-  ];
-
-  const html = `
-    <div style="font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.5;">
-      <h2 style="margin: 0 0 12px;">New career application</h2>
-      <table style="border-collapse: collapse; width: 100%; max-width: 640px;">
-        ${rows
-          .map(
-            ([label, value]) => `
-          <tr>
-            <td style="padding: 8px 10px; border: 1px solid #e5e7eb; font-weight: 600; width: 140px; vertical-align: top;">${escapeHtml(label)}</td>
-            <td style="padding: 8px 10px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${escapeHtml(value)}</td>
-          </tr>`,
-          )
-          .join("")}
-      </table>
-    </div>
-  `;
-
-  const attachments =
-    options.resume && options.resume.size > 0
-      ? [
-          {
-            filename: options.resume.name || "resume.pdf",
-            content: Buffer.from(await options.resume.arrayBuffer()),
-          },
-        ]
-      : undefined;
-
-  const resend = new Resend(apiKey);
-  const result = await resend.emails.send({
-    from,
-    to: [options.toEmail],
-    replyTo: options.email,
-    subject: options.subject,
-    html,
-    attachments,
-  });
-
-  if (result.error) {
-    return {
-      ok: false as const,
-      error: result.error.message || "Unable to send career application email.",
-    };
-  }
-
-  return { ok: true as const };
-}
-
+/**
+ * FormSubmit proxy (same approach as the initial commit).
+ * Prefer browser-side submit in InquiryForm for production on Vercel.
+ */
 export async function POST(request: Request) {
   let parsed: Awaited<ReturnType<typeof parseRequest>>;
 
@@ -191,7 +114,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (type === "career") {
+  if (type === "career" && resume) {
     const resumeError = validateResumeFile(resume);
     if (resumeError) {
       return NextResponse.json({ ok: false, error: resumeError }, { status: 400 });
@@ -199,49 +122,149 @@ export async function POST(request: Request) {
   }
 
   const toEmail = process.env[config.envKey]?.trim() || config.email;
+  const origin =
+    request.headers.get("origin") ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    siteConfig.url;
+  const referer = request.headers.get("referer") || `${origin}/`;
+
   const subject =
     type === "career"
       ? `${config.subjectPrefix} Application from ${name} — ${siteConfig.name}`
       : `${config.subjectPrefix} Inquiry from ${name} — ${siteConfig.name}`;
 
-  // Careers use Resend (FormSubmit activation emails often never arrive for career@).
-  if (type === "career") {
-    try {
-      const result = await sendWithResend({
-        toEmail,
-        subject,
-        name,
-        email,
-        message,
-        role,
-        resume,
+  try {
+    // Prefer JSON like the initial commit when no file is attached.
+    if (!resume) {
+      const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Origin: origin,
+          Referer: referer,
+        },
+        body: JSON.stringify({
+          Inquiry_Type: config.label,
+          name,
+          email,
+          ...(type === "sales"
+            ? { company: company || "Not provided" }
+            : { role_interest: role || "Not provided" }),
+          message,
+          _subject: subject,
+          _template: "table",
+          _replyto: email,
+          _captcha: "false",
+        }),
+        signal: AbortSignal.timeout(20000),
       });
 
-      if (!result.ok) {
-        return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
+      const data = (await response.json().catch(() => null)) as
+        | { success?: string | boolean; message?: string }
+        | null;
+
+      const successFlag = data?.success;
+      const isSuccess = response.ok && (successFlag === true || successFlag === "true");
+      const needsActivation =
+        typeof data?.message === "string" &&
+        data.message.toLowerCase().includes("activation");
+
+      if (needsActivation) {
+        return NextResponse.json({
+          ok: false,
+          activationRequired: true,
+          error: `Almost there — check ${toEmail} for FormSubmit’s activation email and click Activate Form. After that, ${config.label.toLowerCase()} messages will arrive normally.`,
+        });
+      }
+
+      if (!isSuccess) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              data?.message ||
+              `Unable to send your message right now. Please email ${toEmail}.`,
+          },
+          { status: 502 },
+        );
       }
 
       return NextResponse.json({
         ok: true,
-        message: "Application sent successfully. We’ll review your resume and get back to you.",
+        message:
+          type === "career"
+            ? "Application sent successfully. We’ll review your resume and get back to you."
+            : "Message sent successfully.",
       });
+    }
+
+    const outbound = new FormData();
+    outbound.set("Inquiry_Type", config.label);
+    outbound.set("name", name);
+    outbound.set("email", email);
+    outbound.set("message", message);
+    outbound.set("_subject", subject);
+    outbound.set("_template", "table");
+    outbound.set("_replyto", email);
+    outbound.set("_captcha", "false");
+    outbound.set("role_interest", role || "Not provided");
+    outbound.set("attachment", resume, resume.name);
+
+    const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Origin: origin,
+        Referer: referer,
+      },
+      body: outbound,
+      signal: AbortSignal.timeout(20000),
+    });
+
+    const rawText = await response.text();
+    let data: { success?: string | boolean; message?: string } | null = null;
+    try {
+      data = JSON.parse(rawText) as { success?: string | boolean; message?: string };
     } catch {
+      data = null;
+    }
+
+    const providerMessage = data?.message?.trim() || "";
+    const isSuccess =
+      response.ok && (data?.success === true || data?.success === "true");
+
+    if (isActivationMessage(providerMessage) || isActivationMessage(rawText)) {
+      return NextResponse.json({
+        ok: false,
+        activationRequired: true,
+        error: `Almost there — check ${toEmail} for FormSubmit’s activation email and click Activate Form.`,
+      });
+    }
+
+    if (!isSuccess) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Unable to send your application right now. Please email ${toEmail}.`,
+          error:
+            providerMessage ||
+            `Unable to send your message right now. Please email ${toEmail}.`,
         },
         { status: 502 },
       );
     }
-  }
 
-  // Sales stays on browser FormSubmit; this API path is a fallback only.
-  return NextResponse.json(
-    {
-      ok: false,
-      error: `Please submit sales inquiries from the website form. Or email ${toEmail}.`,
-    },
-    { status: 400 },
-  );
+    return NextResponse.json({
+      ok: true,
+      message: "Application sent successfully. We’ll review your resume and get back to you.",
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Unable to send your message right now. Please email ${toEmail}.`,
+      },
+      { status: 502 },
+    );
+  }
 }
