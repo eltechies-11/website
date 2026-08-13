@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { FormEvent, useId, useRef, useState } from "react";
 import { CheckCircle2, FileUp, Send, X } from "lucide-react";
 import { siteConfig, type InquiryType } from "@/content/site";
 import { Button } from "@/components/ui/Button";
@@ -85,23 +85,6 @@ export function InquiryForm({
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
-  const careerEndpoint =
-    process.env.NEXT_PUBLIC_CAREER_FORMSUBMIT_ID?.trim() || siteConfig.emails.career;
-  const careerAction = `https://formsubmit.co/${encodeURIComponent(careerEndpoint)}`;
-  const careerNext = `${siteConfig.url}/careers?applied=1#apply`;
-  const careerSubject = `[Career] Inquiry from ${values.name.trim() || "candidate"} — ${siteConfig.name}`;
-
-  useEffect(() => {
-    if (type !== "career") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("applied") === "1") {
-      setStatus("success");
-      setStatusMessage(
-        "Application sent successfully. We’ll review your resume and get back to you.",
-      );
-    }
-  }, [type]);
-
   const onChange = (field: keyof FormState, value: string) => {
     setValues((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -136,24 +119,15 @@ export function InquiryForm({
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     const nextErrors = validate(values, type, resume);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      event.preventDefault();
       return;
     }
 
-    // Careers: native FormSubmit HTML POST (original FormSubmit flow).
-    // This matches how FormSubmit activation/delivery is designed to work.
-    if (type === "career") {
-      setStatus("submitting");
-      setStatusMessage("");
-      // Allow the browser to submit the form to formsubmit.co
-      return;
-    }
-
-    event.preventDefault();
     setStatus("submitting");
     setStatusMessage("");
 
@@ -191,30 +165,14 @@ export function InquiryForm({
     <form
       onSubmit={onSubmit}
       noValidate
-      action={type === "career" ? careerAction : undefined}
-      method={type === "career" ? "POST" : undefined}
-      encType={type === "career" ? "multipart/form-data" : undefined}
       className={cn(
         "rounded-2xl border border-fg/10 bg-navy/70 p-5 backdrop-blur-sm sm:p-6",
         className,
       )}
     >
-      {type === "career" ? (
-        <>
-          <input type="hidden" name="_next" value={careerNext} />
-          <input type="hidden" name="_subject" value={careerSubject} />
-          <input type="hidden" name="_template" value="table" />
-          <input type="hidden" name="_captcha" value="false" />
-          <input type="hidden" name="_url" value={siteConfig.url} />
-          <input type="hidden" name="Inquiry_Type" value="Career" />
-          <input type="hidden" name="_replyto" value={values.email.trim()} />
-        </>
-      ) : null}
-
       <div className="grid gap-5 sm:grid-cols-2">
         <Field
           id={`${idPrefix}-name`}
-          name="name"
           label="Name"
           value={values.name}
           error={errors.name}
@@ -223,7 +181,6 @@ export function InquiryForm({
         />
         <Field
           id={`${idPrefix}-email`}
-          name="email"
           label="Email"
           type="email"
           value={values.email}

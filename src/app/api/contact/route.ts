@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     siteConfig.url;
   const referer = request.headers.get("referer") || `${origin}/`;
 
-  const subject = `${config.subjectPrefix} Inquiry from ${name} — ${siteConfig.name}`;
+  const subject = `${config.subjectPrefix} Inquiry from ${name} - ${siteConfig.name}`;
 
   try {
     // Prefer JSON like the initial commit when no file is attached.
