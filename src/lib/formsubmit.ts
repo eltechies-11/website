@@ -40,6 +40,13 @@ function formSubmitEndpoint(type: InquiryType) {
   return type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
 }
 
+function buildSubject(type: InquiryType, name: string) {
+  // Keep ASCII hyphen — FormSubmit has ignored React-controlled _subject before
+  // and fell back to the domain’s first subject ([Sales]).
+  const prefix = type === "career" ? "[Career]" : "[Sales]";
+  return `${prefix} Inquiry from ${name} - ${siteConfig.name}`;
+}
+
 /**
  * Browser-side FormSubmit (same provider as the initial commit).
  * Posts from the visitor browser because Vercel server IPs are often blocked
@@ -52,27 +59,24 @@ export async function submitInquiry(
     input.type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
   const endpoint = formSubmitEndpoint(input.type);
   const label = input.type === "career" ? "Career" : "Sales";
-  const subjectPrefix = input.type === "career" ? "[Career]" : "[Sales]";
-
-  const subject = `${subjectPrefix} Inquiry from ${input.name} — ${siteConfig.name}`;
-
-  // Match the initial commit: JSON when possible.
-  // Use multipart only when a resume file must be attached.
-  const useMultipart = Boolean(input.type === "career" && input.resume);
+  const subject = buildSubject(input.type, input.name);
 
   let response: Response;
 
-  if (useMultipart) {
+  // Careers always use multipart so resume + _subject travel in the body
+  // (FormSubmit often ignores HTML hidden _subject from React forms).
+  if (input.type === "career") {
     const formData = new FormData();
+    formData.set("_subject", subject);
+    formData.set("_template", "table");
+    formData.set("_captcha", "false");
+    formData.set("_replyto", input.email);
+    formData.set("_url", siteConfig.url);
     formData.set("Inquiry_Type", label);
     formData.set("name", input.name);
     formData.set("email", input.email);
     formData.set("message", input.message);
     formData.set("role_interest", input.role?.trim() || "Not provided");
-    formData.set("_subject", subject);
-    formData.set("_template", "table");
-    formData.set("_replyto", input.email);
-    formData.set("_captcha", "false");
     if (input.resume) {
       formData.set("attachment", input.resume, input.resume.name);
     }
@@ -90,17 +94,16 @@ export async function submitInquiry(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        Inquiry_Type: label,
-        name: input.name,
-        email: input.email,
-        message: input.message,
-        ...(input.type === "sales"
-          ? { company: input.company?.trim() || "Not provided" }
-          : { role_interest: input.role?.trim() || "Not provided" }),
         _subject: subject,
         _template: "table",
         _replyto: input.email,
         _captcha: "false",
+        _url: siteConfig.url,
+        Inquiry_Type: label,
+        name: input.name,
+        email: input.email,
+        message: input.message,
+        company: input.company?.trim() || "Not provided",
       }),
     });
   }
