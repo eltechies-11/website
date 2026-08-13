@@ -5,6 +5,7 @@ import { CheckCircle2, FileUp, Send, X } from "lucide-react";
 import { siteConfig, type InquiryType } from "@/content/site";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { submitInquiry } from "@/lib/formsubmit";
 import { RESUME_ACCEPT, formatBytes, validateResumeFile } from "@/lib/resume";
 
 type FormState = {
@@ -127,53 +128,25 @@ export function InquiryForm({
     setStatusMessage("");
 
     try {
-      let response: Response;
+      const result = await submitInquiry({
+        type,
+        name: values.name.trim(),
+        email: values.email.trim(),
+        message: values.message.trim(),
+        company: values.company.trim() || undefined,
+        role: values.role.trim() || undefined,
+        resume,
+      });
 
-      if (type === "career") {
-        const formData = new FormData();
-        formData.set("type", type);
-        formData.set("name", values.name.trim());
-        formData.set("email", values.email.trim());
-        formData.set("role", values.role.trim());
-        formData.set("message", values.message.trim());
-        if (resume) formData.set("resume", resume, resume.name);
-
-        response = await fetch("/api/contact", {
-          method: "POST",
-          headers: { Accept: "application/json" },
-          body: formData,
-        });
-      } else {
-        response = await fetch("/api/contact", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type,
-            name: values.name.trim(),
-            email: values.email.trim(),
-            company: values.company.trim() || undefined,
-            message: values.message.trim(),
-          }),
-        });
-      }
-
-      const data = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; message?: string; activationRequired?: boolean }
-        | null;
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Request failed");
+      if (!result.ok) {
+        throw new Error(result.message);
       }
 
       setStatus("success");
       setStatusMessage(
-        data.activationRequired
-          ? data.message ||
-              `Check ${fallbackEmail} for FormSubmit’s activation email, then click Activate Form.`
-          : data.message || "Thanks — your message was sent. We’ll get back to you soon.",
+        result.activationRequired
+          ? result.message
+          : result.message || "Thanks — your message was sent. We’ll get back to you soon.",
       );
       resetForm();
     } catch (error) {
