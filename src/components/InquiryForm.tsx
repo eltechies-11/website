@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useId, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { CheckCircle2, FileUp, Send, X } from "lucide-react";
 import { siteConfig, type InquiryType } from "@/content/site";
 import { Button } from "@/components/ui/Button";
@@ -41,8 +41,11 @@ function validate(values: FormState, type: InquiryType, resume: File | null): Fo
     if (!values.role.trim()) {
       errors.role = "Please select a role.";
     }
-    const resumeError = validateResumeFile(resume);
-    if (resumeError) errors.resume = resumeError;
+    // Resume optional so we stay compatible with the original FormSubmit JSON-style flow.
+    if (resume) {
+      const resumeError = validateResumeFile(resume);
+      if (resumeError) errors.resume = resumeError;
+    }
   }
 
   return errors;
@@ -54,7 +57,6 @@ type InquiryFormProps = {
   submitLabel: string;
   fallbackEmail: string;
   idPrefix: string;
-  /** Pre-select a careers role option value */
   defaultRole?: string;
   className?: string;
 };
@@ -81,6 +83,23 @@ export function InquiryForm({
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
+
+  const careerEndpoint =
+    process.env.NEXT_PUBLIC_CAREER_FORMSUBMIT_ID?.trim() || siteConfig.emails.career;
+  const careerAction = `https://formsubmit.co/${encodeURIComponent(careerEndpoint)}`;
+  const careerNext = `${siteConfig.url}/careers?applied=1#apply`;
+  const careerSubject = `[Career] Application from ${values.name.trim() || "candidate"} — ${siteConfig.name}`;
+
+  useEffect(() => {
+    if (type !== "career") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("applied") === "1") {
+      setStatus("success");
+      setStatusMessage(
+        "Application sent successfully. We’ll review your resume and get back to you.",
+      );
+    }
+  }, [type]);
 
   const onChange = (field: keyof FormState, value: string) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -116,14 +135,24 @@ export function InquiryForm({
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
     const nextErrors = validate(values, type, resume);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
+      event.preventDefault();
       return;
     }
 
+    // Careers: native FormSubmit HTML POST (original FormSubmit flow).
+    // This matches how FormSubmit activation/delivery is designed to work.
+    if (type === "career") {
+      setStatus("submitting");
+      setStatusMessage("");
+      // Allow the browser to submit the form to formsubmit.co
+      return;
+    }
+
+    event.preventDefault();
     setStatus("submitting");
     setStatusMessage("");
 
@@ -161,15 +190,30 @@ export function InquiryForm({
     <form
       onSubmit={onSubmit}
       noValidate
+      action={type === "career" ? careerAction : undefined}
+      method={type === "career" ? "POST" : undefined}
       encType={type === "career" ? "multipart/form-data" : undefined}
       className={cn(
         "rounded-2xl border border-fg/10 bg-navy/70 p-5 backdrop-blur-sm sm:p-6",
         className,
       )}
     >
+      {type === "career" ? (
+        <>
+          <input type="hidden" name="_next" value={careerNext} />
+          <input type="hidden" name="_subject" value={careerSubject} />
+          <input type="hidden" name="_template" value="table" />
+          <input type="hidden" name="_captcha" value="false" />
+          <input type="hidden" name="_url" value={siteConfig.url} />
+          <input type="hidden" name="Inquiry_Type" value="Career" />
+          <input type="hidden" name="_replyto" value={values.email.trim()} />
+        </>
+      ) : null}
+
       <div className="grid gap-5 sm:grid-cols-2">
         <Field
           id={`${idPrefix}-name`}
+          name="name"
           label="Name"
           value={values.name}
           error={errors.name}
@@ -178,6 +222,7 @@ export function InquiryForm({
         />
         <Field
           id={`${idPrefix}-email`}
+          name="email"
           label="Email"
           type="email"
           value={values.email}
@@ -191,6 +236,7 @@ export function InquiryForm({
         {type === "sales" ? (
           <Field
             id={`${idPrefix}-company`}
+            name="company"
             label="Company"
             optional
             value={values.company}
@@ -207,7 +253,7 @@ export function InquiryForm({
             </label>
             <select
               id={`${idPrefix}-role`}
-              name="role"
+              name="role_interest"
               value={values.role}
               onChange={(event) => onChange("role", event.target.value)}
               aria-invalid={Boolean(errors.role)}
@@ -274,12 +320,12 @@ export function InquiryForm({
       {type === "career" ? (
         <div className="mt-5">
           <label htmlFor={resumeInputId} className="mb-2 block text-sm font-medium text-fg/80">
-            Resume
+            Resume <span className="font-normal text-fg/40">(optional)</span>
           </label>
           <input
             ref={resumeInputRef}
             id={resumeInputId}
-            name="resume"
+            name="attachment"
             type="file"
             accept={RESUME_ACCEPT}
             className="sr-only"
@@ -327,7 +373,7 @@ export function InquiryForm({
             <p className="mt-2 text-sm text-red-300">{errors.resume}</p>
           ) : (
             <p className="mt-2 text-xs text-fg/40">
-              Required for applications. Only PDF / DOC / DOCX up to 2 MB.
+              Optional. PDF / DOC / DOCX up to 2 MB.
             </p>
           )}
         </div>
@@ -340,12 +386,13 @@ export function InquiryForm({
             "mt-5 flex gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed",
             status === "success" && "border-cyan/30 bg-cyan/10 text-cyan-soft",
             status === "error" && "border-red-400/30 bg-red-400/10 text-red-200",
+            status === "submitting" && "border-fg/10 bg-fg/5 text-fg/70",
           )}
         >
           {status === "success" ? (
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           ) : null}
-          <p>{statusMessage}</p>
+          <p>{statusMessage || (status === "submitting" ? "Submitting your application…" : null)}</p>
         </div>
       ) : null}
 
@@ -366,6 +413,7 @@ export function InquiryForm({
 
 type FieldProps = {
   id: string;
+  name?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -377,6 +425,7 @@ type FieldProps = {
 
 function Field({
   id,
+  name,
   label,
   value,
   onChange,
@@ -393,7 +442,7 @@ function Field({
       </label>
       <input
         id={id}
-        name={id}
+        name={name || id}
         type={type}
         value={value}
         autoComplete={autoComplete}
