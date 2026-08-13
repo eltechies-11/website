@@ -6,7 +6,7 @@ export const siteConfig = {
   url: "https://eltechies.com",
   emails: {
     sales: "sales@eltechies.com",
-    career: "career@eltechies.com",
+    career: "careers@eltechies.com",
   },
   phones: [
     {
@@ -268,7 +268,7 @@ export const siteConfig = {
     title: "Build with us.",
     description:
       "We’re a lean IT startup. Right now we’re hiring hungry closers who want flexibility and uncapped earning potential.",
-    email: "career@eltechies.com",
+    email: "careers@eltechies.com",
     pageTitle: "Careers at ELtechies",
     pageSupport:
       "Browse open roles and apply with your resume. We’re transparent about how each role works—including pay model and expectations.",
