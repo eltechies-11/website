@@ -128,38 +128,6 @@ export function InquiryForm({
     setStatusMessage("");
 
     try {
-      if (type === "career") {
-        const formData = new FormData();
-        formData.set("type", "career");
-        formData.set("name", values.name.trim());
-        formData.set("email", values.email.trim());
-        formData.set("role", values.role.trim());
-        formData.set("message", values.message.trim());
-        if (resume) formData.set("resume", resume, resume.name);
-
-        const response = await fetch("/api/contact", {
-          method: "POST",
-          headers: { Accept: "application/json" },
-          body: formData,
-        });
-
-        const data = (await response.json().catch(() => null)) as
-          | { ok?: boolean; error?: string; message?: string }
-          | null;
-
-        if (!response.ok || !data?.ok) {
-          throw new Error(data?.error || "Request failed");
-        }
-
-        setStatus("success");
-        setStatusMessage(
-          data.message ||
-            "Application sent successfully. We’ll review your resume and get back to you.",
-        );
-        resetForm();
-        return;
-      }
-
       const result = await submitInquiry({
         type,
         name: values.name.trim(),

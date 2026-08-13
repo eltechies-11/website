@@ -26,16 +26,31 @@ function isSuccessFlag(success: unknown) {
   return success === true || success === "true";
 }
 
+function formSubmitEndpoint(type: InquiryType) {
+  // Optional stable FormSubmit hash from an activation email (avoids flaky
+  // re-activation loops). Example: NEXT_PUBLIC_CAREER_FORMSUBMIT_ID=c277d8d5...
+  if (type === "career") {
+    const hash = process.env.NEXT_PUBLIC_CAREER_FORMSUBMIT_ID?.trim();
+    if (hash) return hash;
+  }
+  if (type === "sales") {
+    const hash = process.env.NEXT_PUBLIC_SALES_FORMSUBMIT_ID?.trim();
+    if (hash) return hash;
+  }
+  return type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
+}
+
 /**
- * Browser-side FormSubmit submit.
- * Vercel server IPs are often blocked by FormSubmit/Cloudflare, so the
- * form posts directly from the visitor's browser instead of /api/contact.
+ * Browser-side FormSubmit (same provider as the initial commit).
+ * Posts from the visitor browser because Vercel server IPs are often blocked
+ * by FormSubmit/Cloudflare.
  */
 export async function submitInquiry(
   input: SubmitInquiryInput,
 ): Promise<SubmitInquiryResult> {
   const toEmail =
     input.type === "career" ? siteConfig.emails.career : siteConfig.emails.sales;
+  const endpoint = formSubmitEndpoint(input.type);
   const label = input.type === "career" ? "Career" : "Sales";
   const subjectPrefix = input.type === "career" ? "[Career]" : "[Sales]";
 
@@ -44,33 +59,54 @@ export async function submitInquiry(
       ? `${subjectPrefix} Application from ${input.name} — ${siteConfig.name}`
       : `${subjectPrefix} Inquiry from ${input.name} — ${siteConfig.name}`;
 
-  const formData = new FormData();
-  formData.set("Inquiry_Type", label);
-  formData.set("name", input.name);
-  formData.set("email", input.email);
-  formData.set("message", input.message);
-  formData.set("_subject", subject);
-  formData.set("_template", "table");
-  formData.set("_replyto", input.email);
-  formData.set("_captcha", "false");
+  // Match the initial commit: JSON when possible.
+  // Use multipart only when a resume file must be attached.
+  const useMultipart = Boolean(input.type === "career" && input.resume);
 
-  if (input.type === "sales") {
-    formData.set("company", input.company?.trim() || "Not provided");
-  } else {
+  let response: Response;
+
+  if (useMultipart) {
+    const formData = new FormData();
+    formData.set("Inquiry_Type", label);
+    formData.set("name", input.name);
+    formData.set("email", input.email);
+    formData.set("message", input.message);
     formData.set("role_interest", input.role?.trim() || "Not provided");
+    formData.set("_subject", subject);
+    formData.set("_template", "table");
+    formData.set("_replyto", input.email);
+    formData.set("_captcha", "false");
     if (input.resume) {
       formData.set("attachment", input.resume, input.resume.name);
     }
-  }
 
-  const response = await fetch(
-    `https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`,
-    {
+    response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(endpoint)}`, {
       method: "POST",
       headers: { Accept: "application/json" },
       body: formData,
-    },
-  );
+    });
+  } else {
+    response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(endpoint)}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        Inquiry_Type: label,
+        name: input.name,
+        email: input.email,
+        message: input.message,
+        ...(input.type === "sales"
+          ? { company: input.company?.trim() || "Not provided" }
+          : { role_interest: input.role?.trim() || "Not provided" }),
+        _subject: subject,
+        _template: "table",
+        _replyto: input.email,
+        _captcha: "false",
+      }),
+    });
+  }
 
   const rawText = await response.text();
   let data: { success?: string | boolean; message?: string } | null = null;
@@ -83,13 +119,11 @@ export async function submitInquiry(
   const providerMessage = data?.message?.trim() || "";
   const ok = response.ok && isSuccessFlag(data?.success);
 
-  // Only treat explicit FormSubmit activation responses as activation.
-  // Do not show a fake success — activation means the email was not delivered.
   if (!ok && isActivationMessage(providerMessage)) {
     return {
       ok: false,
       activationRequired: true,
-      message: `FormSubmit needs a one-time Activate Form click for ${toEmail} on this live site. Check that inbox (and spam) for the newest activation email, click Activate Form, then submit again.`,
+      message: `FormSubmit says ${toEmail} still needs activation for this live site. Search that inbox + spam for “FormSubmit” / “Activate Form”. If no email arrives, open the newest FormSubmit activation mail you ever got for this address and use the random form ID as NEXT_PUBLIC_CAREER_FORMSUBMIT_ID in Vercel (FormSubmit’s recommended fix), then redeploy.`,
     };
   }
 
