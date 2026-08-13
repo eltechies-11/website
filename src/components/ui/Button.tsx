@@ -6,10 +6,10 @@ type ButtonSize = "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "btn-primary bg-[#00d1ff] text-[#021018] shadow-[0_0_0_1px_rgba(0,209,255,0.35)] hover:bg-[#5be7ff] active:translate-y-px",
+    "btn-primary bg-[#00d1ff] text-[#021018] shadow-[0_0_24px_rgba(0,209,255,0.22)] hover:bg-[#5be7ff] hover:shadow-[0_0_32px_rgba(0,209,255,0.35)] active:translate-y-px",
   secondary:
-    "btn-secondary border border-white/25 bg-white/10 text-white hover:border-cyan/50 hover:bg-white/15 active:translate-y-px",
-  ghost: "text-white hover:bg-white/10 hover:text-white",
+    "btn-secondary border border-fg/25 bg-fg/10 text-fg backdrop-blur-sm hover:border-cyan/50 hover:bg-fg/15 active:translate-y-px",
+  ghost: "text-fg hover:bg-fg/10 hover:text-fg",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -44,7 +44,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center gap-2 rounded-lg font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-navy disabled:pointer-events-none disabled:opacity-55",
+    "group/btn inline-flex items-center justify-center gap-2 rounded-lg font-semibold tracking-tight transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-navy disabled:pointer-events-none disabled:opacity-55 [&_svg]:transition-transform [&_svg]:duration-300 group-hover/btn:[&_svg]:translate-x-0.5",
     variantClasses[variant],
     sizeClasses[size],
     className,

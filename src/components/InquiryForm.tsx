@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
-import type { InquiryType } from "@/content/site";
+import { FormEvent, useId, useRef, useState } from "react";
+import { CheckCircle2, FileUp, Send, X } from "lucide-react";
+import { siteConfig, type InquiryType } from "@/content/site";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { RESUME_ACCEPT, formatBytes, validateResumeFile } from "@/lib/resume";
 
 type FormState = {
   name: string;
@@ -14,17 +15,9 @@ type FormState = {
   message: string;
 };
 
-type FormErrors = Partial<Record<keyof FormState, string>>;
+type FormErrors = Partial<Record<keyof FormState | "resume", string>>;
 
-const initialState: FormState = {
-  name: "",
-  email: "",
-  company: "",
-  role: "",
-  message: "",
-};
-
-function validate(values: FormState): FormErrors {
+function validate(values: FormState, type: InquiryType, resume: File | null): FormErrors {
   const errors: FormErrors = {};
 
   if (!values.name.trim()) {
@@ -43,6 +36,14 @@ function validate(values: FormState): FormErrors {
     errors.message = "Message should be at least 10 characters.";
   }
 
+  if (type === "career") {
+    if (!values.role.trim()) {
+      errors.role = "Please select a role.";
+    }
+    const resumeError = validateResumeFile(resume);
+    if (resumeError) errors.resume = resumeError;
+  }
+
   return errors;
 }
 
@@ -52,6 +53,9 @@ type InquiryFormProps = {
   submitLabel: string;
   fallbackEmail: string;
   idPrefix: string;
+  /** Pre-select a careers role option value */
+  defaultRole?: string;
+  className?: string;
 };
 
 export function InquiryForm({
@@ -60,8 +64,19 @@ export function InquiryForm({
   submitLabel,
   fallbackEmail,
   idPrefix,
+  defaultRole = "",
+  className,
 }: InquiryFormProps) {
-  const [values, setValues] = useState<FormState>(initialState);
+  const resumeInputId = useId();
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const [values, setValues] = useState<FormState>({
+    name: "",
+    email: "",
+    company: "",
+    role: type === "career" ? defaultRole : "",
+    message: "",
+  });
+  const [resume, setResume] = useState<File | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -73,9 +88,35 @@ export function InquiryForm({
     }
   };
 
+  const onResumeChange = (file: File | null) => {
+    setResume(file);
+    const resumeError = file ? validateResumeFile(file) : null;
+    setErrors((prev) => ({
+      ...prev,
+      resume: resumeError || undefined,
+    }));
+  };
+
+  const clearResume = () => {
+    setResume(null);
+    if (resumeInputRef.current) resumeInputRef.current.value = "";
+    setErrors((prev) => ({ ...prev, resume: undefined }));
+  };
+
+  const resetForm = () => {
+    setValues({
+      name: "",
+      email: "",
+      company: "",
+      role: type === "career" ? defaultRole : "",
+      message: "",
+    });
+    clearResume();
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextErrors = validate(values);
+    const nextErrors = validate(values, type, resume);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -86,21 +127,38 @@ export function InquiryForm({
     setStatusMessage("");
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type,
-          name: values.name.trim(),
-          email: values.email.trim(),
-          company: values.company.trim() || undefined,
-          role: values.role.trim() || undefined,
-          message: values.message.trim(),
-        }),
-      });
+      let response: Response;
+
+      if (type === "career") {
+        const formData = new FormData();
+        formData.set("type", type);
+        formData.set("name", values.name.trim());
+        formData.set("email", values.email.trim());
+        formData.set("role", values.role.trim());
+        formData.set("message", values.message.trim());
+        if (resume) formData.set("resume", resume, resume.name);
+
+        response = await fetch("/api/contact", {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          body: formData,
+        });
+      } else {
+        response = await fetch("/api/contact", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type,
+            name: values.name.trim(),
+            email: values.email.trim(),
+            company: values.company.trim() || undefined,
+            message: values.message.trim(),
+          }),
+        });
+      }
 
       const data = (await response.json().catch(() => null)) as
         | { ok?: boolean; error?: string; message?: string; activationRequired?: boolean }
@@ -117,7 +175,7 @@ export function InquiryForm({
               `Check ${fallbackEmail} for FormSubmit’s activation email, then click Activate Form.`
           : data.message || "Thanks — your message was sent. We’ll get back to you soon.",
       );
-      setValues(initialState);
+      resetForm();
     } catch (error) {
       setStatus("error");
       setStatusMessage(
@@ -132,7 +190,11 @@ export function InquiryForm({
     <form
       onSubmit={onSubmit}
       noValidate
-      className="rounded-2xl border border-white/10 bg-navy p-5 sm:p-7"
+      encType={type === "career" ? "multipart/form-data" : undefined}
+      className={cn(
+        "rounded-2xl border border-fg/10 bg-navy/70 p-5 backdrop-blur-sm sm:p-6",
+        className,
+      )}
     >
       <div className="grid gap-5 sm:grid-cols-2">
         <Field
@@ -165,20 +227,55 @@ export function InquiryForm({
             onChange={(value) => onChange("company", value)}
           />
         ) : (
-          <Field
-            id={`${idPrefix}-role`}
-            label="Role interest"
-            optional
-            value={values.role}
-            onChange={(value) => onChange("role", value)}
-          />
+          <div>
+            <label
+              htmlFor={`${idPrefix}-role`}
+              className="mb-2 block text-sm font-medium text-fg/80"
+            >
+              Role
+            </label>
+            <select
+              id={`${idPrefix}-role`}
+              name="role"
+              value={values.role}
+              onChange={(event) => onChange("role", event.target.value)}
+              aria-invalid={Boolean(errors.role)}
+              aria-describedby={errors.role ? `${idPrefix}-role-error` : undefined}
+              className={cn(
+                "h-11 w-full appearance-none rounded-xl border bg-navy-elevated bg-[length:1rem] bg-[right_0.85rem_center] bg-no-repeat px-4 pr-10 text-sm text-fg outline-none transition focus:border-cyan/50 focus:ring-2 focus:ring-cyan/30",
+                errors.role ? "border-red-400/60" : "border-fg/10",
+                !values.role && "text-fg/40",
+              )}
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+              }}
+            >
+              <option value="" disabled>
+                Select a role
+              </option>
+              {siteConfig.careers.roleOptions.map((option) => (
+                <option key={option.value} value={option.value} className="bg-navy text-fg">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {errors.role ? (
+              <p id={`${idPrefix}-role-error`} className="mt-2 text-sm text-red-300">
+                {errors.role}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-fg/40">
+                Choose the opening you’re applying for.
+              </p>
+            )}
+          </div>
         )}
       </div>
 
       <div className="mt-5">
         <label
           htmlFor={`${idPrefix}-message`}
-          className="mb-2 block text-sm font-medium text-white/80"
+          className="mb-2 block text-sm font-medium text-fg/80"
         >
           Message
         </label>
@@ -191,8 +288,8 @@ export function InquiryForm({
           aria-invalid={Boolean(errors.message)}
           aria-describedby={errors.message ? `${idPrefix}-message-error` : undefined}
           className={cn(
-            "w-full resize-y rounded-xl border bg-navy-elevated px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-cyan/50 focus:ring-2 focus:ring-cyan/30",
-            errors.message ? "border-red-400/60" : "border-white/10",
+            "w-full resize-y rounded-xl border bg-navy-elevated px-4 py-3 text-sm text-fg outline-none transition placeholder:text-fg/30 focus:border-cyan/50 focus:ring-2 focus:ring-cyan/30",
+            errors.message ? "border-red-400/60" : "border-fg/10",
           )}
           placeholder={messagePlaceholder}
         />
@@ -202,6 +299,68 @@ export function InquiryForm({
           </p>
         ) : null}
       </div>
+
+      {type === "career" ? (
+        <div className="mt-5">
+          <label htmlFor={resumeInputId} className="mb-2 block text-sm font-medium text-fg/80">
+            Resume
+          </label>
+          <input
+            ref={resumeInputRef}
+            id={resumeInputId}
+            name="resume"
+            type="file"
+            accept={RESUME_ACCEPT}
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              onResumeChange(file);
+            }}
+          />
+          <div
+            className={cn(
+              "rounded-xl border border-dashed bg-navy-elevated/80 px-4 py-4 transition",
+              errors.resume ? "border-red-400/60" : "border-fg/15 hover:border-cyan/35",
+            )}
+          >
+            {resume ? (
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-fg">{resume.name}</p>
+                  <p className="mt-1 text-xs text-fg/45">{formatBytes(resume.size)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearResume}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-fg/10 text-fg/70 transition hover:border-red-300/40 hover:text-red-200"
+                  aria-label="Remove resume"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => resumeInputRef.current?.click()}
+                className="flex w-full flex-col items-center gap-2 py-1 text-center"
+              >
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan/25 bg-cyan/10 text-cyan">
+                  <FileUp className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-medium text-fg">Attach resume</span>
+                <span className="text-xs text-fg/45">PDF, DOC, or DOCX · max 2 MB</span>
+              </button>
+            )}
+          </div>
+          {errors.resume ? (
+            <p className="mt-2 text-sm text-red-300">{errors.resume}</p>
+          ) : (
+            <p className="mt-2 text-xs text-fg/40">
+              Required for applications. Only PDF / DOC / DOCX up to 2 MB.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {statusMessage ? (
         <div
@@ -257,9 +416,9 @@ function Field({
 }: FieldProps) {
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-white/80">
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-fg/80">
         {label}
-        {optional ? <span className="ml-1 font-normal text-white/40">(optional)</span> : null}
+        {optional ? <span className="ml-1 font-normal text-fg/40">(optional)</span> : null}
       </label>
       <input
         id={id}
@@ -271,8 +430,8 @@ function Field({
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn(
-          "h-11 w-full rounded-xl border bg-navy-elevated px-4 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-cyan/50 focus:ring-2 focus:ring-cyan/30",
-          error ? "border-red-400/60" : "border-white/10",
+          "h-11 w-full rounded-xl border bg-navy-elevated px-4 text-sm text-fg outline-none transition placeholder:text-fg/30 focus:border-cyan/50 focus:ring-2 focus:ring-cyan/30",
+          error ? "border-red-400/60" : "border-fg/10",
         )}
       />
       {error ? (

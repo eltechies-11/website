@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { siteConfig, type InquiryType } from "@/content/site";
+import { validateResumeFile } from "@/lib/resume";
 
 type ContactPayload = {
   name?: string;
@@ -36,22 +37,72 @@ function resolveType(value: unknown): InquiryType {
   return value === "career" ? "career" : "sales";
 }
 
-export async function POST(request: Request) {
-  let body: ContactPayload;
+function canonicalOrigin(request: Request) {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
 
-  try {
-    body = (await request.json()) as ContactPayload;
-  } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
+  const requestOrigin = request.headers.get("origin")?.replace(/\/$/, "");
+  if (requestOrigin?.includes("localhost") || requestOrigin?.includes("127.0.0.1")) {
+    return requestOrigin;
   }
 
-  const type = resolveType(body.type);
+  return siteConfig.url.replace(/\/$/, "");
+}
+
+function isActivationMessage(message: unknown) {
+  if (typeof message !== "string") return false;
+  const lower = message.toLowerCase();
+  return lower.includes("activation") || lower.includes("activate form");
+}
+
+async function parseRequest(request: Request): Promise<{
+  type: InquiryType;
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  message: string;
+  resume: File | null;
+}> {
+  const contentType = request.headers.get("content-type") || "";
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const resumeValue = form.get("resume");
+    return {
+      type: resolveType(form.get("type")),
+      name: String(form.get("name") ?? "").trim(),
+      email: String(form.get("email") ?? "").trim(),
+      company: String(form.get("company") ?? "").trim(),
+      role: String(form.get("role") ?? "").trim(),
+      message: String(form.get("message") ?? "").trim(),
+      resume: resumeValue instanceof File ? resumeValue : null,
+    };
+  }
+
+  const body = (await request.json()) as ContactPayload;
+  return {
+    type: resolveType(body.type),
+    name: body.name?.trim() ?? "",
+    email: body.email?.trim() ?? "",
+    company: body.company?.trim() ?? "",
+    role: body.role?.trim() ?? "",
+    message: body.message?.trim() ?? "",
+    resume: null,
+  };
+}
+
+export async function POST(request: Request) {
+  let parsed: Awaited<ReturnType<typeof parseRequest>>;
+
+  try {
+    parsed = await parseRequest(request);
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
+  }
+
+  const { type, name, email, company, role, message, resume } = parsed;
   const config = inquiryConfig[type];
-  const name = body.name?.trim() ?? "";
-  const email = body.email?.trim() ?? "";
-  const company = body.company?.trim() ?? "";
-  const role = body.role?.trim() ?? "";
-  const message = body.message?.trim() ?? "";
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -71,12 +122,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (type === "career") {
+    const resumeError = validateResumeFile(resume);
+    if (resumeError) {
+      return NextResponse.json({ ok: false, error: resumeError }, { status: 400 });
+    }
+  }
+
   const toEmail = process.env[config.envKey]?.trim() || config.email;
-  const origin =
-    request.headers.get("origin") ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    siteConfig.url;
-  const referer = request.headers.get("referer") || `${origin}/`;
+  const origin = canonicalOrigin(request);
+  const referer = `${origin}/`;
 
   const subject =
     type === "career"
@@ -84,55 +139,62 @@ export async function POST(request: Request) {
       : `${config.subjectPrefix} Inquiry from ${name} — ${siteConfig.name}`;
 
   try {
+    const outbound = new FormData();
+    outbound.set("Inquiry_Type", config.label);
+    outbound.set("name", name);
+    outbound.set("email", email);
+    outbound.set("message", message);
+    outbound.set("_subject", subject);
+    outbound.set("_template", "table");
+    outbound.set("_replyto", email);
+    outbound.set("_captcha", "false");
+
+    if (type === "sales") {
+      outbound.set("company", company || "Not provided");
+    } else {
+      outbound.set("role_interest", role || "Not provided");
+      if (resume) {
+        outbound.set("attachment", resume, resume.name);
+      }
+    }
+
     const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(toEmail)}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
         Origin: origin,
         Referer: referer,
       },
-      body: JSON.stringify({
-        Inquiry_Type: config.label,
-        name,
-        email,
-        ...(type === "sales"
-          ? { company: company || "Not provided" }
-          : { role_interest: role || "Not provided" }),
-        message,
-        _subject: subject,
-        _template: "table",
-        _replyto: email,
-        _captcha: "false",
-      }),
+      body: outbound,
+      signal: AbortSignal.timeout(20000),
     });
 
-    const data = (await response.json().catch(() => null)) as
-      | { success?: string | boolean; message?: string }
-      | null;
+    const rawText = await response.text();
+    let data: { success?: string | boolean; message?: string } | null = null;
+    try {
+      data = JSON.parse(rawText) as { success?: string | boolean; message?: string };
+    } catch {
+      data = null;
+    }
 
     const successFlag = data?.success;
-    const isSuccess =
-      response.ok && (successFlag === true || successFlag === "true");
+    const isSuccess = successFlag === true || successFlag === "true";
+    const providerMessage = data?.message?.trim() || "";
 
-    const needsActivation =
-      typeof data?.message === "string" &&
-      data.message.toLowerCase().includes("activation");
-
-    if (needsActivation) {
+    if (isActivationMessage(providerMessage) || isActivationMessage(rawText)) {
       return NextResponse.json({
         ok: true,
         activationRequired: true,
-        message: `Almost there — check ${toEmail} for FormSubmit’s activation email and click Activate Form. After that, ${config.label.toLowerCase()} messages will arrive normally.`,
+        message: `Almost there — check ${toEmail} for FormSubmit’s activation email and click Activate Form (needed once for ${origin}). After that, ${config.label.toLowerCase()} messages will arrive normally.`,
       });
     }
 
-    if (!isSuccess) {
+    if (!response.ok || !isSuccess) {
       return NextResponse.json(
         {
           ok: false,
           error:
-            data?.message ||
+            providerMessage ||
             `Unable to send your message right now. Please email ${toEmail}.`,
         },
         { status: 502 },
@@ -141,7 +203,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: "Message sent successfully.",
+      message:
+        type === "career"
+          ? "Application sent successfully. We’ll review your resume and get back to you."
+          : "Message sent successfully.",
     });
   } catch {
     return NextResponse.json(
