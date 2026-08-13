@@ -54,10 +54,7 @@ export async function submitInquiry(
   const label = input.type === "career" ? "Career" : "Sales";
   const subjectPrefix = input.type === "career" ? "[Career]" : "[Sales]";
 
-  const subject =
-    input.type === "career"
-      ? `${subjectPrefix} Application from ${input.name} — ${siteConfig.name}`
-      : `${subjectPrefix} Inquiry from ${input.name} — ${siteConfig.name}`;
+  const subject = `${subjectPrefix} Inquiry from ${input.name} — ${siteConfig.name}`;
 
   // Match the initial commit: JSON when possible.
   // Use multipart only when a resume file must be attached.

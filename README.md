@@ -64,13 +64,13 @@ Forms use **FormSubmit.co** from the browser (same provider as the initial commi
 
 ```env
 SALES_EMAIL=sales@eltechies.com
-CAREER_EMAIL=career@eltechies.com
+CAREER_EMAIL=careers@eltechies.com
 NEXT_PUBLIC_SITE_URL=https://eltechies.com
 ```
 
 Email subjects are prefixed with `[Sales]` or `[Career]`.
 
-**One-time activation:** first submission for each inbox (`sales@` / `career@`) on each domain sends a FormSubmit confirmation email. Click **Activate Form**.
+**One-time activation:** first submission for each inbox (`sales@` / `careers@`) on each domain sends a FormSubmit confirmation email. Click **Activate Form**.
 
 If FormSubmit keeps saying “needs activation” but no email arrives (common for some custom-domain inboxes):
 1. Search spam/junk for FormSubmit
@@ -99,7 +99,7 @@ Best approach: **host the app on Vercel (free) + keep your domain on GoDaddy**.
 5. Add environment variables:
 
    - `SALES_EMAIL` = `sales@eltechies.com`
-   - `CAREER_EMAIL` = `career@eltechies.com`
+   - `CAREER_EMAIL` = `careers@eltechies.com`
    - `NEXT_PUBLIC_SITE_URL` = `https://eltechies.com`
    - Optional if activation is stuck: `NEXT_PUBLIC_CAREER_FORMSUBMIT_ID` / `NEXT_PUBLIC_SALES_FORMSUBMIT_ID`
 

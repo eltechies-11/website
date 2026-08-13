@@ -41,8 +41,9 @@ function validate(values: FormState, type: InquiryType, resume: File | null): Fo
     if (!values.role.trim()) {
       errors.role = "Please select a role.";
     }
-    // Resume optional so we stay compatible with the original FormSubmit JSON-style flow.
-    if (resume) {
+    if (!resume) {
+      errors.resume = "Please attach your resume.";
+    } else {
       const resumeError = validateResumeFile(resume);
       if (resumeError) errors.resume = resumeError;
     }
@@ -88,7 +89,7 @@ export function InquiryForm({
     process.env.NEXT_PUBLIC_CAREER_FORMSUBMIT_ID?.trim() || siteConfig.emails.career;
   const careerAction = `https://formsubmit.co/${encodeURIComponent(careerEndpoint)}`;
   const careerNext = `${siteConfig.url}/careers?applied=1#apply`;
-  const careerSubject = `[Career] Application from ${values.name.trim() || "candidate"} — ${siteConfig.name}`;
+  const careerSubject = `[Career] Inquiry from ${values.name.trim() || "candidate"} — ${siteConfig.name}`;
 
   useEffect(() => {
     if (type !== "career") return;
@@ -320,7 +321,7 @@ export function InquiryForm({
       {type === "career" ? (
         <div className="mt-5">
           <label htmlFor={resumeInputId} className="mb-2 block text-sm font-medium text-fg/80">
-            Resume <span className="font-normal text-fg/40">(optional)</span>
+            Resume
           </label>
           <input
             ref={resumeInputRef}
@@ -372,9 +373,7 @@ export function InquiryForm({
           {errors.resume ? (
             <p className="mt-2 text-sm text-red-300">{errors.resume}</p>
           ) : (
-            <p className="mt-2 text-xs text-fg/40">
-              Optional. PDF / DOC / DOCX up to 2 MB.
-            </p>
+            <p className="mt-2 text-xs text-fg/40">PDF / DOC / DOCX up to 2 MB.</p>
           )}
         </div>
       ) : null}

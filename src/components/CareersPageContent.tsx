@@ -123,7 +123,7 @@ export function CareersPageContent() {
                     Apply now
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-fg/55">
-                    Select the role, share a short note, and optionally attach your resume. We’ll
+                    Select the role, share a short note, and attach your resume. We’ll
                     reply at{" "}
                     <a
                       href={`mailto:${siteConfig.careers.email}`}
