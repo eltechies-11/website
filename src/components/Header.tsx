@@ -21,6 +21,8 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("#home");
   const onCareers = pathname === "/careers";
+  const onPortfolio = pathname === "/portfolio";
+  const onStandalonePage = onCareers || onPortfolio;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -30,7 +32,7 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    if (onCareers) return;
+    if (onStandalonePage) return;
 
     const sectionIds = [
       "home",
@@ -67,7 +69,7 @@ export function Header() {
 
     elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [onCareers]);
+  }, [onStandalonePage]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -80,7 +82,10 @@ export function Header() {
 
   const isActive = (href: string) => {
     if (href === "/careers") return onCareers;
-    if (onCareers) return false;
+    if (href === "/portfolio") {
+      return onPortfolio || (!onStandalonePage && activeSection === "#work");
+    }
+    if (onStandalonePage) return false;
     return sectionFromHashHref(href) === activeSection;
   };
 
