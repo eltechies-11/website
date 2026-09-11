@@ -41,7 +41,7 @@ export const siteConfig = {
   nav: [
     { label: "Home", href: "/#home" },
     { label: "Services", href: "/#services" },
-    { label: "Work", href: "/#work" },
+    { label: "Portfolio", href: "/portfolio" },
     { label: "About", href: "/#about" },
     { label: "Careers", href: "/careers" },
     { label: "Contact", href: "/#contact" },
@@ -52,7 +52,7 @@ export const siteConfig = {
     support:
       "We design and develop web platforms, mobile apps, and custom software—helping teams turn ideas into reliable digital products.",
     primaryCta: { label: "Let's Talk", href: "/#contact" },
-    secondaryCta: { label: "Explore Services", href: "/#services" },
+    secondaryCta: { label: "View Portfolio", href: "/portfolio" },
   },
   services: [
     {
@@ -92,50 +92,86 @@ export const siteConfig = {
     },
   ],
   work: {
-    eyebrow: "Selected work",
-    title: "Projects we’ve shaped end to end.",
+    eyebrow: "Portfolio",
+    title: "Products we've designed and shipped.",
     description:
-      "A sample of product and platform work across web, mobile, and operations—built for clarity, speed, and long-term ownership.",
+      "A selection of live mobile apps and web experiences—from sports platforms and social products to wellness and personal development.",
+    pageTitle: "Products we've designed and shipped.",
+    pageSupport:
+      "Browse live apps and websites we've built—open any project for the website or store listing.",
     projects: [
       {
-        id: "northline-ops",
-        title: "Northline Operations Portal",
-        client: "Northline Logistics",
-        category: "Web application",
+        id: "racquet-heroes",
+        title: "Racquet Heroes",
+        category: "Mobile App · Website",
         summary:
-          "A dispatch and tracking portal that replaced scattered spreadsheets with live shipment status, role-based access, and clearer handoffs between warehouses.",
-        outcome: "Cut status-check emails by ~60% in the first quarter after launch.",
-        stack: ["Next.js", "TypeScript", "PostgreSQL"],
+          "An all-in-one scoring and tournament platform for badminton, tennis, pickleball, padel, table tennis, and squash—live score sharing, custom draws, scheduling, and match analytics.",
+        image: "/images/portfolio/racquet-heroes-phones.jpg",
+        imageAlt:
+          "Racquet Heroes app screens for live scoring, tournaments, custom draws, and match analytics",
+        wide: true,
+        links: [
+          { label: "Website", href: "https://racquetheroes.com/" },
+          {
+            label: "Google Play",
+            href: "https://play.google.com/store/apps/details?id=com.racquetheroes.racquetheroes",
+          },
+          {
+            label: "App Store",
+            href: "https://apps.apple.com/us/app/racquet-heroes-score-share/id6473603119",
+          },
+        ],
       },
       {
-        id: "haven-care",
-        title: "Haven Care Companion",
-        client: "Haven Care Clinics",
-        category: "Mobile app",
+        id: "intrsting",
+        title: "Intrsting",
+        category: "Mobile App · Website",
         summary:
-          "A patient companion app for appointment reminders, visit prep, and secure messaging with clinic staff—designed for calm, accessible use on the go.",
-        outcome: "Missed appointments dropped noticeably within the first two months.",
-        stack: ["React Native", "Node.js", "AWS"],
+          "A social connection platform built for intentional meetups—replacing endless swipes with real conversations, scheduling, and purpose-led matching.",
+        image: "/images/portfolio/intrsting-web.jpg",
+        imageAlt:
+          "Intrsting website hero with yellow brand backdrop and connection messaging",
+        links: [
+          { label: "Website", href: "https://intrsting.com/" },
+          {
+            label: "Google Play",
+            href: "https://play.google.com/store/apps/details?id=com.app.intrsting",
+          },
+        ],
       },
       {
-        id: "ledgerly",
-        title: "Ledgerly Billing Desk",
-        client: "Ledgerly Finance",
-        category: "Custom software",
+        id: "soothify",
+        title: "Soothify",
+        category: "Mobile App · Website",
         summary:
-          "An internal billing desk that automates invoice drafts, approval trails, and payment reconciliation for a multi-entity finance team.",
-        outcome: "Month-end close moved from days of manual work to a guided checklist.",
-        stack: ["React", "NestJS", "Cloud & DevOps"],
+          "Daily affirmations, manifestation journeys, and guided audio tracks that help people rewire limiting beliefs and build calmer, more intentional routines.",
+        image: "/images/portfolio/soothify-web.jpg",
+        imageAlt:
+          "Soothify marketing site with app mockups and download calls to action",
+        links: [
+          { label: "Website", href: "https://soothify.app/" },
+          {
+            label: "Google Play",
+            href: "https://play.google.com/store/apps/details?id=com.soothify.app",
+          },
+        ],
       },
       {
-        id: "orbit-insights",
-        title: "Orbit Insights Dashboard",
-        client: "Orbit Retail Group",
-        category: "AI-assisted analytics",
+        id: "inspire-idp",
+        title: "Inspire IDP",
+        category: "Mobile App",
         summary:
-          "A retail insights dashboard with practical forecasting and anomaly alerts—focused on decisions managers can act on, not vanity charts.",
-        outcome: "Store leads review one shared board instead of five conflicting reports.",
-        stack: ["Next.js", "Python", "AI / ML"],
+          "An individual development companion for athletes and coaches—SMART goals, progress tracking, role-based workflows, and focused skill improvement.",
+        image: "/images/portfolio/inspireidp-phones.jpg",
+        imageAlt:
+          "Inspire IDP app screens showing goals, progress charts, and athlete-coach roles",
+        wide: true,
+        links: [
+          {
+            label: "Google Play",
+            href: "https://play.google.com/store/apps/details?id=com.inspireidp.app",
+          },
+        ],
       },
     ],
   },
